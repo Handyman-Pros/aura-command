@@ -1,10 +1,13 @@
-import { motion } from 'framer-motion';
-import { RegionHealth } from '@/lib/types';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RegionHealth, Property } from '@/lib/types';
 import StatusBadge from './StatusBadge';
+import RegionDetail from './RegionDetail';
 import { Shield, AlertTriangle, Activity } from 'lucide-react';
 
 interface SystemHealthProps {
   regions: RegionHealth[];
+  properties?: Property[];
 }
 
 export default function SystemHealth({ regions }: SystemHealthProps) {

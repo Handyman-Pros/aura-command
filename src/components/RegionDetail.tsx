@@ -12,6 +12,7 @@ interface RegionDetailProps {
 }
 
 export default function RegionDetail({ region, properties, onBack }: RegionDetailProps) {
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const regionProperties = properties.filter(p => region.states.includes(p.state));
 
   return (
@@ -82,7 +83,8 @@ export default function RegionDetail({ region, properties, onBack }: RegionDetai
                 initial={{ opacity: 0, x: -15 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 + i * 0.06 }}
-                className="flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors"
+                className="flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+                onClick={() => setSelectedProperty(prop)}
               >
                 <div className="flex items-center gap-3">
                   <StatusBadge status={prop.status} pulse={prop.status !== 'safe'} />

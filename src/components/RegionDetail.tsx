@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { RegionHealth, Property } from '@/lib/types';
 import StatusBadge from './StatusBadge';
-import { ArrowLeft, Shield, AlertTriangle, Building2, Activity } from 'lucide-react';
+import PropertyDrawer from './PropertyDrawer';
+import { ArrowLeft, Shield, AlertTriangle, Building2, Activity, ChevronRight } from 'lucide-react';
 
 interface RegionDetailProps {
   region: RegionHealth;

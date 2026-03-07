@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { RegionHealth, Property } from '@/lib/types';
 import StatusBadge from './StatusBadge';
-import { ArrowLeft, Shield, AlertTriangle, Building2, Activity } from 'lucide-react';
+import PropertyDrawer from './PropertyDrawer';
+import { ArrowLeft, Shield, AlertTriangle, Building2, Activity, ChevronRight } from 'lucide-react';
 
 interface RegionDetailProps {
   region: RegionHealth;
@@ -10,6 +12,7 @@ interface RegionDetailProps {
 }
 
 export default function RegionDetail({ region, properties, onBack }: RegionDetailProps) {
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const regionProperties = properties.filter(p => region.states.includes(p.state));
 
   return (
@@ -80,7 +83,8 @@ export default function RegionDetail({ region, properties, onBack }: RegionDetai
                 initial={{ opacity: 0, x: -15 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 + i * 0.06 }}
-                className="flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors"
+                className="flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+                onClick={() => setSelectedProperty(prop)}
               >
                 <div className="flex items-center gap-3">
                   <StatusBadge status={prop.status} pulse={prop.status !== 'safe'} />
@@ -100,12 +104,15 @@ export default function RegionDetail({ region, properties, onBack }: RegionDetai
                     <p className="font-mono text-xs text-foreground">{prop.lastCheckin}</p>
                     <p className="font-mono text-[9px] text-muted-foreground">CHECKIN</p>
                   </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               </motion.div>
             ))
           )}
         </div>
       </div>
+
+      <PropertyDrawer property={selectedProperty} onClose={() => setSelectedProperty(null)} />
     </motion.div>
   );
 }

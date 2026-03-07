@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Property, SystemStatus } from '@/lib/types';
 import StatusBadge from './StatusBadge';
 import { X, Thermometer, Flame, Zap, ShieldCheck, Droplets, Lock, Wifi, Wind } from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 
 interface PropertyDrawerProps {
   property: Property | null;
@@ -14,21 +16,31 @@ interface SystemBreakdown {
   status: SystemStatus;
   detail: string;
   load: number;
+  sparkline: { value: number }[];
+}
+
+function generateSparkline(baseLoad: number, status: SystemStatus): { value: number }[] {
+  const points = 20;
+  const variance = status === 'critical' ? 25 : status === 'warning' ? 15 : 8;
+  return Array.from({ length: points }, (_, i) => {
+    const trend = status === 'critical' ? i * 1.2 : status === 'warning' ? i * 0.4 : 0;
+    const noise = (Math.sin(i * 1.7) * variance * 0.6) + (Math.cos(i * 2.3) * variance * 0.4);
+    return { value: Math.max(0, Math.min(100, baseLoad + noise + trend - (points * trend) / (points * 2))) };
+  });
 }
 
 function generateSystems(prop: Property): SystemBreakdown[] {
   const systems: SystemBreakdown[] = [
-    { name: 'HVAC', icon: Thermometer, status: 'safe', detail: '72°F avg · All zones nominal', load: 62 },
-    { name: 'Fire Safety', icon: Flame, status: 'safe', detail: 'All panels reporting · Last test 2h ago', load: 8 },
-    { name: 'Electrical', icon: Zap, status: 'safe', detail: 'Load balanced · Peak 44kW', load: 44 },
-    { name: 'Security', icon: ShieldCheck, status: 'safe', detail: 'All cameras online · No breaches', load: 31 },
-    { name: 'Plumbing', icon: Droplets, status: 'safe', detail: 'Pressure nominal · No leaks', load: 18 },
-    { name: 'Access Control', icon: Lock, status: 'safe', detail: '142 locks synced · Firmware current', load: 12 },
-    { name: 'Network', icon: Wifi, status: 'safe', detail: '1.2Gbps throughput · 0.1% packet loss', load: 55 },
-    { name: 'Ventilation', icon: Wind, status: 'safe', detail: 'Air quality index: 42 (Good)', load: 38 },
+    { name: 'HVAC', icon: Thermometer, status: 'safe', detail: '72°F avg · All zones nominal', load: 62, sparkline: [] },
+    { name: 'Fire Safety', icon: Flame, status: 'safe', detail: 'All panels reporting · Last test 2h ago', load: 8, sparkline: [] },
+    { name: 'Electrical', icon: Zap, status: 'safe', detail: 'Load balanced · Peak 44kW', load: 44, sparkline: [] },
+    { name: 'Security', icon: ShieldCheck, status: 'safe', detail: 'All cameras online · No breaches', load: 31, sparkline: [] },
+    { name: 'Plumbing', icon: Droplets, status: 'safe', detail: 'Pressure nominal · No leaks', load: 18, sparkline: [] },
+    { name: 'Access Control', icon: Lock, status: 'safe', detail: '142 locks synced · Firmware current', load: 12, sparkline: [] },
+    { name: 'Network', icon: Wifi, status: 'safe', detail: '1.2Gbps throughput · 0.1% packet loss', load: 55, sparkline: [] },
+    { name: 'Ventilation', icon: Wind, status: 'safe', detail: 'Air quality index: 42 (Good)', load: 38, sparkline: [] },
   ];
 
-  // Simulate issues based on property status
   if (prop.status === 'warning') {
     systems[0].status = 'warning';
     systems[0].detail = '78°F Zone 3 — +4.2°F deviation';
@@ -43,10 +55,18 @@ function generateSystems(prop: Property): SystemBreakdown[] {
     systems[2].load = 92;
   }
 
-  return systems;
+  return systems.map(s => ({ ...s, sparkline: generateSparkline(s.load, s.status) }));
 }
 
+const statusColor = (status: SystemStatus) =>
+  status === 'safe' ? 'hsl(152, 80%, 48%)' : status === 'warning' ? 'hsl(36, 95%, 55%)' : 'hsl(0, 85%, 55%)';
+
+const statusColorFaded = (status: SystemStatus) =>
+  status === 'safe' ? 'hsl(152, 80%, 48%, 0.15)' : status === 'warning' ? 'hsl(36, 95%, 55%, 0.15)' : 'hsl(0, 85%, 55%, 0.15)';
+
 export default function PropertyDrawer({ property, onClose }: PropertyDrawerProps) {
+  const systems = useMemo(() => (property ? generateSystems(property) : []), [property]);
+
   return (
     <AnimatePresence>
       {property && (
@@ -115,7 +135,7 @@ export default function PropertyDrawer({ property, onClose }: PropertyDrawerProp
               <span className="font-mono text-[10px] text-muted-foreground tracking-widest">SYSTEM BREAKDOWN</span>
 
               <div className="space-y-2">
-                {generateSystems(property).map((sys, i) => (
+                {systems.map((sys, i) => (
                   <motion.div
                     key={sys.name}
                     initial={{ opacity: 0, x: 20 }}
@@ -123,7 +143,7 @@ export default function PropertyDrawer({ property, onClose }: PropertyDrawerProp
                     transition={{ delay: 0.2 + i * 0.04 }}
                     className="rounded-lg border border-border bg-secondary/20 p-3"
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <sys.icon className={`h-3.5 w-3.5 ${
                           sys.status === 'safe' ? 'text-safe' : sys.status === 'warning' ? 'text-warning' : 'text-critical'
@@ -132,7 +152,33 @@ export default function PropertyDrawer({ property, onClose }: PropertyDrawerProp
                       </div>
                       <StatusBadge status={sys.status} />
                     </div>
-                    <p className="font-mono text-[10px] text-muted-foreground mb-2">{sys.detail}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground mb-1.5">{sys.detail}</p>
+
+                    {/* Sparkline */}
+                    <div className="h-10 w-full mb-1.5">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={sys.sparkline} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                          <defs>
+                            <linearGradient id={`grad-${sys.name}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={statusColor(sys.status)} stopOpacity={0.3} />
+                              <stop offset="100%" stopColor={statusColor(sys.status)} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <YAxis domain={[0, 100]} hide />
+                          <Area
+                            type="monotone"
+                            dataKey="value"
+                            stroke={statusColor(sys.status)}
+                            strokeWidth={1.5}
+                            fill={`url(#grad-${sys.name})`}
+                            isAnimationActive
+                            animationDuration={800}
+                            animationEasing="ease-out"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+
                     {/* Load bar */}
                     <div className="h-1.5 w-full rounded-full bg-secondary">
                       <motion.div

@@ -10,13 +10,23 @@ interface SystemHealthProps {
   properties?: Property[];
 }
 
-export default function SystemHealth({ regions }: SystemHealthProps) {
+export default function SystemHealth({ regions, properties = [] }: SystemHealthProps) {
+  const [selectedRegion, setSelectedRegion] = useState<RegionHealth | null>(null);
   const totalAlerts = regions.reduce((s, r) => s + r.activeAlerts, 0);
   const avgUptime = regions.reduce((s, r) => s + r.uptime, 0) / regions.length;
   const totalProperties = regions.reduce((s, r) => s + r.propertiesCount, 0);
 
   return (
-    <div className="space-y-4">
+    <AnimatePresence mode="wait">
+      {selectedRegion ? (
+        <RegionDetail
+          key="detail"
+          region={selectedRegion}
+          properties={properties}
+          onBack={() => setSelectedRegion(null)}
+        />
+      ) : (
+    <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -40 }} className="space-y-4">
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         {[
@@ -56,7 +66,8 @@ export default function SystemHealth({ regions }: SystemHealthProps) {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors"
+              className="flex items-center justify-between px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+              onClick={() => setSelectedRegion(region)}
             >
               <div className="flex items-center gap-3">
                 <StatusBadge status={region.status} pulse={region.status !== 'safe'} />
@@ -83,6 +94,8 @@ export default function SystemHealth({ regions }: SystemHealthProps) {
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

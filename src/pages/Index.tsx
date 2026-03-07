@@ -36,7 +36,7 @@ export default function Dashboard() {
             <MapView properties={properties || []} />
 
             {/* System Health */}
-            <SystemHealth regions={regions || []} />
+            <SystemHealth regions={regions || []} properties={properties || []} />
           </>
         )}
       </div>

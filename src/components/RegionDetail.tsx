@@ -104,12 +104,15 @@ export default function RegionDetail({ region, properties, onBack }: RegionDetai
                     <p className="font-mono text-xs text-foreground">{prop.lastCheckin}</p>
                     <p className="font-mono text-[9px] text-muted-foreground">CHECKIN</p>
                   </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               </motion.div>
             ))
           )}
         </div>
       </div>
+
+      <PropertyDrawer property={selectedProperty} onClose={() => setSelectedProperty(null)} />
     </motion.div>
   );
 }

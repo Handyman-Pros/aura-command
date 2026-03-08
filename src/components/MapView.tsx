@@ -1,17 +1,35 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Property } from '@/lib/types';
 import StatusBadge from './StatusBadge';
-import { MapPin, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
-// Simplified US map using viewport coordinates
-const statePositions: Record<string, { x: number; y: number }> = {
-  NY: { x: 82, y: 28 }, CA: { x: 10, y: 45 }, FL: { x: 78, y: 75 },
-  CO: { x: 35, y: 40 }, AZ: { x: 22, y: 58 }, IL: { x: 62, y: 35 },
-  HI: { x: 25, y: 85 }, TX: { x: 45, y: 68 }, WA: { x: 12, y: 12 },
-  OR: { x: 10, y: 22 }, NV: { x: 15, y: 40 }, UT: { x: 25, y: 40 },
-  MT: { x: 30, y: 15 }, GA: { x: 75, y: 60 }, MA: { x: 88, y: 25 },
-};
+// Custom marker icons by status
+function createIcon(status: string) {
+  const color = status === 'safe' ? 'hsl(152,80%,48%)' : status === 'warning' ? 'hsl(30,95%,55%)' : 'hsl(0,72%,51%)';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40">
+    <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.27 21.73 0 14 0z" fill="${color}" fill-opacity="0.9"/>
+    <circle cx="14" cy="14" r="6" fill="white" fill-opacity="0.9"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [28, 40],
+    iconAnchor: [14, 40],
+    popupAnchor: [0, -40],
+  });
+}
+
+function FlyToProperty({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo([lat, lng], 10, { duration: 1.2 });
+  }, [lat, lng, map]);
+  return null;
+}
 
 interface MapViewProps {
   properties: Property[];
@@ -20,7 +38,7 @@ interface MapViewProps {
 
 export default function MapView({ properties, onSelectProperty }: MapViewProps) {
   const [query, setQuery] = useState('');
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
@@ -31,34 +49,25 @@ export default function MapView({ properties, onSelectProperty }: MapViewProps) 
   }, [query, properties]);
 
   const handleSelect = (prop: Property) => {
-    setFocusedId(prop.id);
+    setFlyTo({ lat: prop.lat, lng: prop.lng });
     setQuery('');
     onSelectProperty?.(prop);
-    setTimeout(() => setFocusedId(null), 3000);
+  };
+
+  const safeIcon = useMemo(() => createIcon('safe'), []);
+  const warningIcon = useMemo(() => createIcon('warning'), []);
+  const criticalIcon = useMemo(() => createIcon('critical'), []);
+
+  const getIcon = (status: string) => {
+    if (status === 'safe') return safeIcon;
+    if (status === 'warning') return warningIcon;
+    return criticalIcon;
   };
 
   return (
     <div className="relative w-full rounded-xl border border-border bg-card overflow-hidden" style={{ aspectRatio: '16/9' }}>
-      {/* Grid background */}
-      <div className="absolute inset-0 surface-grid opacity-30" />
-      
-      {/* Scan line effect */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-full h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-scan-line" />
-      </div>
-
-      {/* US outline approximation */}
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-10">
-        <path
-          d="M 8,15 L 15,10 25,8 35,10 45,8 55,10 65,12 75,15 85,20 90,25 88,35 85,45 82,55 80,65 78,72 75,78 70,75 65,70 58,72 50,70 45,68 40,65 35,58 30,55 25,50 20,48 15,42 10,35 8,25 Z"
-          fill="none"
-          stroke="hsl(152 80% 48%)"
-          strokeWidth="0.3"
-        />
-      </svg>
-
       {/* Search bar */}
-      <div className="absolute top-3 right-3 z-20 w-56">
+      <div className="absolute top-3 right-3 z-[1000] w-56">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
@@ -99,63 +108,51 @@ export default function MapView({ properties, onSelectProperty }: MapViewProps) 
         </AnimatePresence>
       </div>
 
-      {/* Property pins */}
-      {properties.map((prop, i) => {
-        const pos = statePositions[prop.state] || { x: 50, y: 50 };
-        const color = prop.status === 'safe' ? 'text-safe' : prop.status === 'warning' ? 'text-warning' : 'text-critical';
-        const pulseClass = prop.status === 'safe' ? 'pulse-safe' : prop.status === 'warning' ? 'pulse-warning' : 'pulse-critical';
-        const isFocused = focusedId === prop.id;
-
-        return (
-          <motion.button
-            key={prop.id}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{
-              scale: isFocused ? 1.8 : 1,
-              opacity: 1,
-            }}
-            transition={isFocused ? { type: 'spring', bounce: 0.5 } : { delay: i * 0.08, type: 'spring', bounce: 0.4 }}
-            onClick={() => onSelectProperty?.(prop)}
-            className={`absolute group ${isFocused ? 'z-10' : ''}`}
-            style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
-          >
-            <div className={`relative flex h-4 w-4 items-center justify-center rounded-full ${pulseClass}`}>
-              <MapPin className={`h-4 w-4 ${color} drop-shadow-lg`} />
-              {isFocused && (
-                <motion.div
-                  initial={{ scale: 0, opacity: 0.8 }}
-                  animate={{ scale: 3, opacity: 0 }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className={`absolute inset-0 rounded-full border-2 ${prop.status === 'safe' ? 'border-safe' : prop.status === 'warning' ? 'border-warning' : 'border-critical'}`}
-                />
-              )}
-            </div>
-            {/* Tooltip */}
-            <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 ${isFocused ? 'block' : 'hidden group-hover:block'}`}>
-              <div className="rounded-lg bg-popover border border-border px-3 py-2 shadow-xl min-w-[180px]">
-                <p className="font-mono text-[10px] text-muted-foreground mb-0.5">{prop.state} · {prop.city}</p>
-                <p className="text-xs font-semibold text-foreground">{prop.name}</p>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <StatusBadge status={prop.status} pulse />
-                  <span className="font-mono text-[10px] text-muted-foreground">{prop.activeSystems}/{prop.totalSystems}</span>
-                </div>
-              </div>
-            </div>
-          </motion.button>
-        );
-      })}
-
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-3 rounded-lg bg-card/90 backdrop-blur px-3 py-1.5 border border-border">
+      <div className="absolute bottom-3 left-3 z-[1000] flex items-center gap-3 rounded-lg bg-card/90 backdrop-blur px-3 py-1.5 border border-border">
         <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-safe" /><span className="font-mono text-[9px] text-muted-foreground">NOMINAL</span></div>
         <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-warning" /><span className="font-mono text-[9px] text-muted-foreground">DISPATCH</span></div>
         <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-critical" /><span className="font-mono text-[9px] text-muted-foreground">CRITICAL</span></div>
       </div>
 
       {/* Title overlay */}
-      <div className="absolute top-3 left-3">
+      <div className="absolute top-3 left-3 z-[1000]">
         <span className="font-mono text-[10px] text-muted-foreground tracking-widest">GLOBAL MAP VIEW</span>
       </div>
+
+      {/* Leaflet Map */}
+      <MapContainer
+        center={[39.5, -98.35]}
+        zoom={4}
+        className="h-full w-full"
+        zoomControl={false}
+        attributionControl={false}
+        style={{ background: 'hsl(220, 16%, 7%)' }}
+      >
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        />
+        {flyTo && <FlyToProperty lat={flyTo.lat} lng={flyTo.lng} />}
+        {properties.map(prop => (
+          <Marker
+            key={prop.id}
+            position={[prop.lat, prop.lng]}
+            icon={getIcon(prop.status)}
+            eventHandlers={{
+              click: () => onSelectProperty?.(prop),
+            }}
+          >
+            <Popup className="leaflet-dark-popup">
+              <div className="font-mono text-[10px] text-muted-foreground">{prop.state} · {prop.city}</div>
+              <div className="text-xs font-semibold">{prop.name}</div>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <StatusBadge status={prop.status} pulse />
+                <span className="font-mono text-[10px] text-muted-foreground">{prop.activeSystems}/{prop.totalSystems}</span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
     </div>
   );
 }

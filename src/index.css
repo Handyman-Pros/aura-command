@@ -122,3 +122,25 @@
 ::-webkit-scrollbar-track { background: hsl(220 14% 10%); }
 ::-webkit-scrollbar-thumb { background: hsl(220 12% 25%); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(220 12% 35%); }
+
+/* Leaflet dark popup */
+.leaflet-dark-popup .leaflet-popup-content-wrapper {
+  background: hsl(220 14% 12%);
+  color: hsl(210 20% 90%);
+  border: 1px solid hsl(220 12% 20%);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+}
+.leaflet-dark-popup .leaflet-popup-tip {
+  background: hsl(220 14% 12%);
+  border: 1px solid hsl(220 12% 20%);
+}
+.leaflet-dark-popup .leaflet-popup-content {
+  margin: 8px 12px;
+}
+.leaflet-dark-popup .leaflet-popup-close-button {
+  color: hsl(215 15% 50%) !important;
+}
+.leaflet-dark-popup .leaflet-popup-close-button:hover {
+  color: hsl(210 20% 90%) !important;
+}

@@ -5,6 +5,7 @@ import StatusBadge from './StatusBadge';
 import { X, Thermometer, Flame, Zap, ShieldCheck, Droplets, Lock, Wifi, Wind, Send, CheckCircle, Star, Phone } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 import { mockVendors } from '@/lib/mock-data';
+import { toast } from 'sonner';
 
 interface PropertyDrawerProps {
   property: Property | null;
@@ -82,6 +83,9 @@ export default function PropertyDrawer({ property, onClose }: PropertyDrawerProp
   const handleDispatch = (systemName: string, vendor: Vendor) => {
     setDispatchedSystems(prev => ({ ...prev, [systemName]: vendor.name }));
     setDispatchingSystem(null);
+    toast.success(`Vendor dispatched to ${property?.name}`, {
+      description: `${vendor.name} assigned to ${systemName} · ${vendor.trade} · ★${vendor.rating}`,
+    });
   };
 
   return (

@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Property, SystemStatus } from '@/lib/types';
+import { Property, SystemStatus, Vendor } from '@/lib/types';
 import StatusBadge from './StatusBadge';
-import { X, Thermometer, Flame, Zap, ShieldCheck, Droplets, Lock, Wifi, Wind } from 'lucide-react';
+import { X, Thermometer, Flame, Zap, ShieldCheck, Droplets, Lock, Wifi, Wind, Send, CheckCircle, Star, Phone } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
+import { mockVendors } from '@/lib/mock-data';
 
 interface PropertyDrawerProps {
   property: Property | null;
@@ -61,11 +62,27 @@ function generateSystems(prop: Property): SystemBreakdown[] {
 const statusColor = (status: SystemStatus) =>
   status === 'safe' ? 'hsl(152, 80%, 48%)' : status === 'warning' ? 'hsl(36, 95%, 55%)' : 'hsl(0, 85%, 55%)';
 
-const statusColorFaded = (status: SystemStatus) =>
-  status === 'safe' ? 'hsl(152, 80%, 48%, 0.15)' : status === 'warning' ? 'hsl(36, 95%, 55%, 0.15)' : 'hsl(0, 85%, 55%, 0.15)';
+function getMatchingVendors(systemName: string, propertyState: string): Vendor[] {
+  const tradeMap: Record<string, string> = {
+    'HVAC': 'HVAC', 'Fire Safety': 'Fire Safety', 'Electrical': 'Electrical',
+    'Security': 'Security Systems', 'Plumbing': 'Plumbing', 'Access Control': 'Security Systems',
+    'Network': 'Electrical', 'Ventilation': 'HVAC',
+  };
+  const trade = tradeMap[systemName] || systemName;
+  const vendors = mockVendors.filter(v => v.trade === trade && v.complianceStatus === 'compliant');
+  // Prefer same-state vendors, then others
+  return [...vendors.filter(v => v.state === propertyState), ...vendors.filter(v => v.state !== propertyState)].slice(0, 3);
+}
 
 export default function PropertyDrawer({ property, onClose }: PropertyDrawerProps) {
   const systems = useMemo(() => (property ? generateSystems(property) : []), [property]);
+  const [dispatchingSystem, setDispatchingSystem] = useState<string | null>(null);
+  const [dispatchedSystems, setDispatchedSystems] = useState<Record<string, string>>({});
+
+  const handleDispatch = (systemName: string, vendor: Vendor) => {
+    setDispatchedSystems(prev => ({ ...prev, [systemName]: vendor.name }));
+    setDispatchingSystem(null);
+  };
 
   return (
     <AnimatePresence>
@@ -135,64 +152,147 @@ export default function PropertyDrawer({ property, onClose }: PropertyDrawerProp
               <span className="font-mono text-[10px] text-muted-foreground tracking-widest">SYSTEM BREAKDOWN</span>
 
               <div className="space-y-2">
-                {systems.map((sys, i) => (
-                  <motion.div
-                    key={sys.name}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + i * 0.04 }}
-                    className="rounded-lg border border-border bg-secondary/20 p-3"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <sys.icon className={`h-3.5 w-3.5 ${
-                          sys.status === 'safe' ? 'text-safe' : sys.status === 'warning' ? 'text-warning' : 'text-critical'
-                        }`} />
-                        <span className="text-sm font-medium text-foreground">{sys.name}</span>
+                {systems.map((sys, i) => {
+                  const isDispatched = !!dispatchedSystems[sys.name];
+                  const isDispatchOpen = dispatchingSystem === sys.name;
+                  const canDispatch = sys.status !== 'safe' && !isDispatched;
+                  const matchingVendors = isDispatchOpen ? getMatchingVendors(sys.name, property.state) : [];
+
+                  return (
+                    <motion.div
+                      key={sys.name}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2 + i * 0.04 }}
+                      className="rounded-lg border border-border bg-secondary/20 p-3"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <sys.icon className={`h-3.5 w-3.5 ${
+                            sys.status === 'safe' ? 'text-safe' : sys.status === 'warning' ? 'text-warning' : 'text-critical'
+                          }`} />
+                          <span className="text-sm font-medium text-foreground">{sys.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={sys.status} />
+                          {isDispatched && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="flex items-center gap-1 rounded-full bg-safe/15 px-2 py-0.5"
+                            >
+                              <CheckCircle className="h-3 w-3 text-safe" />
+                              <span className="font-mono text-[9px] text-safe">DISPATCHED</span>
+                            </motion.div>
+                          )}
+                          {canDispatch && (
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setDispatchingSystem(isDispatchOpen ? null : sys.name)}
+                              className={`flex items-center gap-1 rounded-full px-2 py-0.5 border transition-colors ${
+                                isDispatchOpen
+                                  ? 'bg-primary/15 border-primary text-primary'
+                                  : 'border-border hover:border-warning text-muted-foreground hover:text-warning'
+                              }`}
+                            >
+                              <Send className="h-3 w-3" />
+                              <span className="font-mono text-[9px]">DISPATCH</span>
+                            </motion.button>
+                          )}
+                        </div>
                       </div>
-                      <StatusBadge status={sys.status} />
-                    </div>
-                    <p className="font-mono text-[10px] text-muted-foreground mb-1.5">{sys.detail}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground mb-1.5">
+                        {isDispatched ? `Vendor dispatched: ${dispatchedSystems[sys.name]}` : sys.detail}
+                      </p>
 
-                    {/* Sparkline */}
-                    <div className="h-10 w-full mb-1.5">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={sys.sparkline} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-                          <defs>
-                            <linearGradient id={`grad-${sys.name}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={statusColor(sys.status)} stopOpacity={0.3} />
-                              <stop offset="100%" stopColor={statusColor(sys.status)} stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <YAxis domain={[0, 100]} hide />
-                          <Area
-                            type="monotone"
-                            dataKey="value"
-                            stroke={statusColor(sys.status)}
-                            strokeWidth={1.5}
-                            fill={`url(#grad-${sys.name})`}
-                            isAnimationActive
-                            animationDuration={800}
-                            animationEasing="ease-out"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
+                      {/* Vendor dispatch panel */}
+                      <AnimatePresence>
+                        {isDispatchOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-2 rounded-lg border border-border bg-card/80 p-3 space-y-2">
+                              <span className="font-mono text-[9px] text-muted-foreground tracking-widest">SELECT VENDOR</span>
+                              {matchingVendors.length === 0 ? (
+                                <p className="font-mono text-[10px] text-muted-foreground">No compliant vendors available</p>
+                              ) : (
+                                matchingVendors.map(v => (
+                                  <motion.button
+                                    key={v.id}
+                                    whileHover={{ scale: 1.01 }}
+                                    whileTap={{ scale: 0.99 }}
+                                    onClick={() => handleDispatch(sys.name, v)}
+                                    className="w-full flex items-center justify-between rounded-md border border-border hover:border-primary/50 bg-secondary/30 px-3 py-2 transition-colors text-left"
+                                  >
+                                    <div>
+                                      <p className="text-xs font-semibold text-foreground">{v.name}</p>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="font-mono text-[9px] text-muted-foreground">{v.trade}</span>
+                                        <span className="font-mono text-[9px] text-muted-foreground">·</span>
+                                        <span className="font-mono text-[9px] text-muted-foreground">{v.state}</span>
+                                        <div className="flex items-center gap-0.5">
+                                          <Star className="h-2.5 w-2.5 text-warning fill-warning" />
+                                          <span className="font-mono text-[9px] text-muted-foreground">{v.rating}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Phone className="h-3 w-3 text-muted-foreground" />
+                                      <Send className="h-3 w-3 text-primary" />
+                                    </div>
+                                  </motion.button>
+                                ))
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
 
-                    {/* Load bar */}
-                    <div className="h-1.5 w-full rounded-full bg-secondary">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${sys.load}%` }}
-                        transition={{ delay: 0.3 + i * 0.04, duration: 0.6, ease: 'easeOut' }}
-                        className={`h-full rounded-full ${
-                          sys.status === 'safe' ? 'bg-safe' : sys.status === 'warning' ? 'bg-warning' : 'bg-critical'
-                        }`}
-                      />
-                    </div>
-                    <p className="font-mono text-[9px] text-muted-foreground mt-1 text-right">{sys.load}% LOAD</p>
-                  </motion.div>
-                ))}
+                      {/* Sparkline */}
+                      <div className="h-10 w-full mb-1.5">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={sys.sparkline} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                            <defs>
+                              <linearGradient id={`grad-${sys.name}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={statusColor(sys.status)} stopOpacity={0.3} />
+                                <stop offset="100%" stopColor={statusColor(sys.status)} stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <YAxis domain={[0, 100]} hide />
+                            <Area
+                              type="monotone"
+                              dataKey="value"
+                              stroke={statusColor(sys.status)}
+                              strokeWidth={1.5}
+                              fill={`url(#grad-${sys.name})`}
+                              isAnimationActive
+                              animationDuration={800}
+                              animationEasing="ease-out"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Load bar */}
+                      <div className="h-1.5 w-full rounded-full bg-secondary">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${sys.load}%` }}
+                          transition={{ delay: 0.3 + i * 0.04, duration: 0.6, ease: 'easeOut' }}
+                          className={`h-full rounded-full ${
+                            sys.status === 'safe' ? 'bg-safe' : sys.status === 'warning' ? 'bg-warning' : 'bg-critical'
+                          }`}
+                        />
+                      </div>
+                      <p className="font-mono text-[9px] text-muted-foreground mt-1 text-right">{sys.load}% LOAD</p>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
           </motion.div>

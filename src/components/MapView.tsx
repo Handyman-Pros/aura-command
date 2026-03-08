@@ -1,7 +1,8 @@
-import { motion } from 'framer-motion';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Property } from '@/lib/types';
 import StatusBadge from './StatusBadge';
-import { MapPin } from 'lucide-react';
+import { MapPin, Search, X } from 'lucide-react';
 
 // Simplified US map using viewport coordinates
 const statePositions: Record<string, { x: number; y: number }> = {
@@ -18,6 +19,24 @@ interface MapViewProps {
 }
 
 export default function MapView({ properties, onSelectProperty }: MapViewProps) {
+  const [query, setQuery] = useState('');
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return properties.filter(p =>
+      p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q) || p.state.toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [query, properties]);
+
+  const handleSelect = (prop: Property) => {
+    setFocusedId(prop.id);
+    setQuery('');
+    onSelectProperty?.(prop);
+    setTimeout(() => setFocusedId(null), 3000);
+  };
+
   return (
     <div className="relative w-full rounded-xl border border-border bg-card overflow-hidden" style={{ aspectRatio: '16/9' }}>
       {/* Grid background */}
@@ -38,27 +57,81 @@ export default function MapView({ properties, onSelectProperty }: MapViewProps) 
         />
       </svg>
 
+      {/* Search bar */}
+      <div className="absolute top-3 right-3 z-20 w-56">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search properties..."
+            className="w-full h-8 pl-8 pr-8 rounded-lg bg-card/90 backdrop-blur border border-border text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+              <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+            </button>
+          )}
+        </div>
+        <AnimatePresence>
+          {results.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="mt-1 rounded-lg bg-popover border border-border shadow-xl overflow-hidden"
+            >
+              {results.map(prop => (
+                <button
+                  key={prop.id}
+                  onClick={() => handleSelect(prop)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent/50 transition-colors"
+                >
+                  <div>
+                    <p className="text-xs font-semibold text-foreground truncate">{prop.name}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{prop.city}, {prop.state}</p>
+                  </div>
+                  <StatusBadge status={prop.status} />
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Property pins */}
       {properties.map((prop, i) => {
         const pos = statePositions[prop.state] || { x: 50, y: 50 };
         const color = prop.status === 'safe' ? 'text-safe' : prop.status === 'warning' ? 'text-warning' : 'text-critical';
         const pulseClass = prop.status === 'safe' ? 'pulse-safe' : prop.status === 'warning' ? 'pulse-warning' : 'pulse-critical';
+        const isFocused = focusedId === prop.id;
 
         return (
           <motion.button
             key={prop.id}
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.08, type: 'spring', bounce: 0.4 }}
+            animate={{
+              scale: isFocused ? 1.8 : 1,
+              opacity: 1,
+            }}
+            transition={isFocused ? { type: 'spring', bounce: 0.5 } : { delay: i * 0.08, type: 'spring', bounce: 0.4 }}
             onClick={() => onSelectProperty?.(prop)}
-            className="absolute group"
+            className={`absolute group ${isFocused ? 'z-10' : ''}`}
             style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
           >
             <div className={`relative flex h-4 w-4 items-center justify-center rounded-full ${pulseClass}`}>
               <MapPin className={`h-4 w-4 ${color} drop-shadow-lg`} />
+              {isFocused && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0.8 }}
+                  animate={{ scale: 3, opacity: 0 }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className={`absolute inset-0 rounded-full border-2 ${prop.status === 'safe' ? 'border-safe' : prop.status === 'warning' ? 'border-warning' : 'border-critical'}`}
+                />
+              )}
             </div>
             {/* Tooltip */}
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+            <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 ${isFocused ? 'block' : 'hidden group-hover:block'}`}>
               <div className="rounded-lg bg-popover border border-border px-3 py-2 shadow-xl min-w-[180px]">
                 <p className="font-mono text-[10px] text-muted-foreground mb-0.5">{prop.state} · {prop.city}</p>
                 <p className="text-xs font-semibold text-foreground">{prop.name}</p>

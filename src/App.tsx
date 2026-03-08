@@ -7,6 +7,7 @@ import AppNav from "./components/AppNav";
 import Index from "./pages/Index";
 import VendorSearch from "./pages/VendorSearch";
 import LogicMonitor from "./pages/LogicMonitor";
+import DispatchHistory from "./pages/DispatchHistory";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/vendors" element={<VendorSearch />} />
           <Route path="/monitor" element={<LogicMonitor />} />
+          <Route path="/dispatches" element={<DispatchHistory />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

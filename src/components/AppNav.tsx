@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Globe, Search, Activity, Settings, Radio } from 'lucide-react';
+import { Globe, Search, Activity, Settings, Radio, ClipboardList } from 'lucide-react';
 
 const navItems = [
   { path: '/', label: 'Command Center', icon: Globe },
   { path: '/vendors', label: 'Vendor Search', icon: Search },
   { path: '/monitor', label: 'Logic Monitor', icon: Activity },
+  { path: '/dispatches', label: 'Dispatches', icon: ClipboardList },
   { path: '/settings', label: 'API Settings', icon: Settings },
 ];
 
